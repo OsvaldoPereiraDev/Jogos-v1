@@ -22,7 +22,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         {/* Avatar */}
         <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isModel ? 'bg-emerald-600 mr-3 shadow-lg shadow-emerald-900/50' : 'bg-blue-600 ml-3 shadow-lg shadow-blue-900/50'}`}>
           <span className="material-icons text-sm text-white font-mono font-bold">
-            {isModel ? 'AI' : 'U'}
+            {isModel ? 'IA' : 'VC'}
           </span>
         </div>
 
@@ -37,7 +37,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             <button 
               onClick={handleCopy}
               className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-white bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-              title="Copy Analysis"
+              title="Copiar Análise"
             >
               {copied ? (
                 <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
@@ -51,7 +51,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
           {!isModel && message.images && message.images.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
               {message.images.map((img, idx) => (
-                <img key={idx} src={img} alt="Uploaded" className="max-w-[150px] max-h-[150px] rounded-lg border border-white/20 object-cover" />
+                <img key={idx} src={img} alt="Imagem enviada" className="max-w-[150px] max-h-[150px] rounded-lg border border-white/20 object-cover" />
               ))}
             </div>
           )}

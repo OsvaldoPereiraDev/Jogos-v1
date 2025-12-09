@@ -1,7 +1,15 @@
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { ModelType, BettingStrategy } from "../types";
 
-const API_KEY = process.env.API_KEY || '';
+// Safety check for process.env
+const getApiKey = () => {
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    return process.env.API_KEY;
+  }
+  return '';
+};
+
+const API_KEY = getApiKey();
 
 // Initialize client
 const ai = new GoogleGenAI({ apiKey: API_KEY });
@@ -13,125 +21,229 @@ export const generateFootballAnalysis = async (
   leagues: string,
   onStream: (chunk: string) => void
 ): Promise<string> => {
-  if (!API_KEY) throw new Error("API Key not found");
+  if (!API_KEY) throw new Error("Chave de API não encontrada");
 
-  const strategyInstructions = strategy === BettingStrategy.VALUE 
-    ? `
-    - **MODO: APOSTA DE VALOR (AGRESSIVO)**
-    - Foco em encontrar **ODDS DESAJUSTADAS** (onde a probabilidade real é maior que a implícita na odd).
-    - Busque odds entre **1.70 e 2.50**.
-    - O Bilhete Combinado deve ter um **Retorno Potencial Alto**, aceitando um risco maior.
-    - Priorize mercados como Handicap Asiático, DNB (Empate Anula) ou Over Gols em jogos disputados.
-    `
-    : `
-    - **MODO: CONSERVADOR (SEGURANÇA)**
-    - Foco na **TAXA DE ACERTO (Strike Rate)**. Minimize o risco ao máximo.
-    - Busque odds seguras entre **1.25 e 1.60**.
-    - O Bilhete Combinado deve priorizar a **proteção** (ex: Dupla Hipótese, Over 1.5, Handicap Positivo).
-    - Critério de Confiança ALTA deve ser extremamente rígido.
-    `;
+  // Determine prompt based on strategy
+  let promptTemplate = '';
 
-  const leagueInstruction = leagues.trim() 
-    ? `5. **FILTRO DE LIGAS:** A análise deve focar EXCLUSIVAMENTE ou PRIORITARIAMENTE nas seguintes competições: **${leagues}**. Se houver poucas oportunidades nestas ligas, você pode expandir para outras Ligas Top-Tier, mas mencione isso.`
-    : `5. **LIGAS:** Priorize as 5 Grandes Ligas Europeias (Big 5), Primeira Liga Portugal, Brasileirão (se ativo) e competições da UEFA. Evite ligas inferiores a menos que os dados sejam cristalinos.`;
+  const deepAnalysisProtocol = `
+  ### 🔬 PROTOCOLO DE ANÁLISE ESPORTIVA PROFUNDA (Obrigatório para TODOS os jogos)
+  Antes de sugerir qualquer aposta, você deve processar internamente uma análise neutra e objetiva baseada nestes pilares:
 
-  const promptTemplate = `
-  Você é um **analista profissional de apostas de futebol**, especializado em **previsões seguras, responsáveis e estritamente baseadas em dados reais e factuais**. O foco é na **integridade da informação, na minimização de riscos e na exclusividade de dados de alta fidelidade**.
+  1.  **Contexto da Liga:**
+      *   Analise a previsibilidade atual da competição e o equilíbrio entre as equipas.
+      *   Identifique tendências táticas da liga (ex: liga de muitos gols, liga física/defensiva).
 
-O objetivo é gerar **uma análise completa, estruturada e exportável (em formato Markdown)** com todas as partidas confirmadas dentro do **intervalo de datas fornecido** e montar um **Bilhete Combinado com 4 a 6 jogos de Confiança ALTA**.
+  2.  **Raio-X das Equipas (Mandante vs Visitante):**
+      *   **Regularidade:** Desempenho atual e evolução ao longo da temporada.
+      *   **Tática:** Padrões ofensivos/defensivos e ritmo de jogo.
+      *   **Casa/Fora:** Desempenho específico como mandante ou visitante (não apenas geral).
 
----
+  3.  **Metadados Estatísticos (Crucial):**
+      *   Compare média de gols marcados/sofridos.
+      *   Compare **xG (Gols Esperados)** vs Gols Reais (para identificar sorte/azar).
+      *   Posse de bola efetiva e média de chutes no alvo.
 
-## 🧩 REQUISITOS E SAÍDA
+  4.  **Fatores Externos e Físicos:**
+      *   **Calendário:** Cansaço acumulado (jogos recentes ou viagens longas).
+      *   **Elenco:** Lesões de jogadores-chave (especialmente goleiros e artilheiros).
+      *   **Clima:** Previsão de chuva/neve que possa afetar o estilo de jogo e estado do gramado.
 
-1. **Entrada Necessária:** Um **intervalo de datas** no formato DD/MM/AAAA a DD/MM/AAAA.
-   DATA_INICIAL = ${startDate}
-   DATA_FINAL = ${endDate}
-
-2. **Linguagem de Saída:** Todo o resultado deve ser gerado **em Português (Portugal/Brasil)**.
-
-3. **RESTRIÇÃO DE DATAS (CRÍTICO):** Apenas analise e liste jogos que ocorram **ESTRITAMENTE** dentro do intervalo de datas de ${startDate} até ${endDate}. **Descarte imediatamente qualquer jogo fora deste período.**
-
-4. **ESTRATÉGIA SELECIONADA:**
-   ${strategyInstructions}
-
-${leagueInstruction}
-
----
-
-## 🔍 METODOLOGIA DE ANÁLISE (Etapas da IA)
-
-### 1️⃣ Pesquisa de Dados (Foco na Alta Fidelidade e Consistência)
-
-- **A IA deve fazer pesquisa única e abrangente** (consultando fontes de alta confiança como FlashScore, SofaScore, OddsPortal, **e especificamente https://cornerprobet.com/**) para o intervalo de datas.
-- **Restrição Crucial de Fidelidade:** **NUNCA invente ou "alucine" dados, odds, resultados ou jogos.** Se a pesquisa não retornar dados concretos, informe o utilizador.
-- **Coleta Fiel:** Use os **dados e odds mais consistentes e recentes encontrados na pesquisa**.
-
-### 2️⃣ Listagem de Partidas e Pré-Análise
-
-Para cada jogo CONFIRMADO (e DENTRO DO INTERVALO DE DATAS):
-
-- 🏟️ **Competição** e **Equipas** (Mandante × Visitante)
-- 🕒 **Horário** (Fuso de Lisboa/Brasília)
-- 💰 **Odds Médias Iniciais (1X2)**
-- **Determinação Preliminar:** Indicar a equipa favorita e o Resultado Mais Provável.
-
-### 3️⃣ Análise Técnica e Estatística Detalhada
-
-A IA deve aprofundar a análise para cada jogo listado:
-
-- **Critérios de Decisão:** Forma Recente, H2H, Fator Casa/Fora, Lesões/Suspensões.
-- **Sugestão de Aposta:** Escolher **UM** mercado otimizado, alinhado à ESTRATÉGIA SELECIONADA (${strategy === BettingStrategy.VALUE ? 'Valor' : 'Segurança'}).
-
----
-
-## 🧠 JUSTIFICATIVAS E CONFIANÇA
-
-Cada jogo selecionado deve ter:
-- **Justificativa (1-2 Linhas):** Resumo da análise factual.
-- **Índice de Confiança:** **BAIXA** / **MÉDIA** / **ALTA**.
-
-> **Critério para 'Confiança ALTA':**
-> ${strategy === BettingStrategy.VALUE 
-    ? "Deve haver uma discrepância clara entre a probabilidade estatística e a odd oferecida (Valor Esperado Positivo). Risco aceitável se a odd compensar." 
-    : "Todos os indicadores (Forma, H2H, Motivação) devem apontar para o mesmo lado. A chance de 'zebra' deve ser estatisticamente irrelevante."}
-
----
-
-## 📊 SAÍDA PRINCIPAL: TABELA DE ANÁLISE COMPLETA (Markdown)
-
-A IA deve gerar a tabela com **TODOS** os jogos analisados, no seguinte formato:
-
-| Data | Competição | Jogo | Odds (1X2) | Equipa Favorita | Sugestão de Aposta | Mercado Otimizado | Confiança |
-| ---- | ---------- | ---- | ---------- | --------------- | ------------------ | ----------------- | --------- |
-| ...  | ...        | ...  | ...        | ...             | ...                | ...               | ...       |
-
----
-
-## 🏅 AS 3 MELHORES OPORTUNIDADES
-
-**Após a tabela**, a IA deve destacar:
-- **As 3 melhores oportunidades** do período (Melhor relação Risco x Retorno).
-
----
-
-## 🎟️ BILHETE COMBINADO FINAL (4 a 6 JOGOS)
-
-1.  **Seleção:** Selecionar **entre 4 a 6 jogos** com a maior aderência à estratégia **${strategy}**.
-2.  **Formato de Saída:**
-
-| #   | Data | Competição | Jogo | Mercado Otimizado | Odd Estimada | Confiança |
-| --- | ---- | ---------- | ---- | ----------------- | ------------ | --------- |
-| 1   | ...  | ...        | ...  | ...               | ...          | ...       |
-
-3.  **Resumo Final:** Total de Odds e Nível de Risco Geral.
-
----
-
-## ⚠️ AVISO LEGAL (Rodapé)
-
-> As análises e sugestões são informativas. Apostar envolve risco. Aposte com responsabilidade.
+  5.  **PREVISÃO NEUTRA:**
+      *   Baseada **apenas no desempenho esportivo**, quem está em melhor fase? Quem tem mais consistência tática?
+      *   *Ignore as odds nesta etapa. Foque apenas na realidade do campo.*
   `;
+
+  const commonQualityRules = `
+  ### 🛡️ FILTRO DE SEGURANÇA E DATAS (CRÍTICO - TOLERÂNCIA ZERO)
+  1. **FILTRO RIGOROSO DE DATAS:**
+     - O intervalo selecionado é ESTRITAMENTE: **${startDate} a ${endDate}**.
+     - **Passo Obrigatório:** Para cada jogo candidato, verifique a data.
+     - Se Jogo_Data < ${startDate} OU Jogo_Data > ${endDate} -> **EXCLUA IMEDIATAMENTE**.
+     - Se não houver jogos qualificados nestas datas exatas, responda: "Não foram encontrados jogos de alta qualidade para as datas selecionadas (${startDate} a ${endDate})."
+  
+  2. **DATA E HORA:**
+     - É OBRIGATÓRIO exibir a **Data e Hora** da partida na tabela.
+     - Use o formato: DD/MM HH:mm (Ex: 14/05 16:30).
+
+  3. **O Fator 'Advogado do Diabo' (Anti-Viés):**
+     - Antes de confirmar qualquer aposta com Confiança ALTA ou EXTREMA, tente ativamente **REFUTAR** a sua própria tese. Pergunte-se: "Por que essa aposta daria errado?". Se houver um motivo plausível (ex: lesão de última hora, histórico de 'bogey team'), REDUZA a confiança para MÉDIA ou remova o jogo.
+  `;
+
+  // Dynamic Ticket Instruction based on user preferences
+  const ticketInstruction = `
+  ## 🎟️ BILHETE COMBINADO FINAL (4 a 6 JOGOS)
+  
+  Monte um bilhete otimizado seguindo RIGOROSAMENTE estas regras:
+
+  1. **Seleção Exclusiva:** O bilhete deve ser composto **APENAS** por jogos que obtiveram o índice de **Confiança ALTA** ou **EXTREMA** na sua análise anterior.
+  2. **Intervalo de Datas:** Todos os jogos devem ocorrer entre **${startDate} e ${endDate}**. (Pode misturar datas dentro deste intervalo).
+  3. **Limite Flexível:** Selecione **entre 4 a 6 jogos**.
+     - Se houver menos de 4 jogos de Confiança ALTA/EXTREMA disponíveis nestas datas, liste apenas os que existem e avise sobre a baixa liquidez. **NÃO INCLUA JOGOS DE CONFIANÇA MÉDIA/BAIXA PARA PREENCHER ESPAÇO.**
+  4. **Diversificação:** 
+     ${strategy === BettingStrategy.EV_PREMIUM 
+       ? '- Como esta é uma estratégia EV+ (Win & BTTS), foque neste mercado. Se houver risco excessivo, busque mercados de gols (Over 2.5) nos mesmos jogos de alta confiança.' 
+       : '- Diversifique os **mercados** (ex: Vitória Simples, Over/Under Gols, Handicap, Dupla Chance) para equilibrar o risco.'}
+  5. **Formato de Saída (Obrigatório):**
+
+  | # | Data / Hora | Competição | Jogo | Mercado Otimizado | Odd Estimada | Confiança |
+  | - | :--- | :--- | :--- | :--- | :--- | :--- |
+  | 1 | DD/MM HH:mm | ... | ... | ... | ... | **ALTA** |
+
+  **Resumo Final:**
+  - **Odd Total Combinada (Estimada):** X.XX
+  - **Análise de Risco do Bilhete:** (Baixo/Médio/Alto) - *Justifique.*
+  `;
+
+  const verificationChecklist = `
+  ---
+  ### 🛡️ VERIFICAÇÃO FINAL ANTES DE GERAR A RESPOSTA
+  Antes de enviar, revise sua própria saída:
+  1. [ ] Todos os jogos listados estão entre **${startDate}** e **${endDate}**? (Se não, apague).
+  2. [ ] A tabela principal tem coluna de Data/Hora?
+  3. [ ] O Bilhete Combinado tem apenas jogos de Confiança ALTA/EXTREMA?
+  `;
+
+  if (strategy === BettingStrategy.EV_PREMIUM) {
+    // --- EV+ PREMIUM PROMPT ---
+    const leagueConstraint = leagues.trim()
+        ? `\n   - **FILTRO DE LIGAS (CRÍTICO):** Analisar ESTRITAMENTE jogos das ligas: **${leagues}**. Ignore qualquer outra liga.`
+        : `\n   - **LIGAS:** Priorizar Ligas Top-Tier onde os dados de xG são confiáveis.`;
+
+    promptTemplate = `
+# 🧠 PROMPT — ANÁLISE QUANTITATIVA PREDICTIVA DE ALTO VALOR (EV+ PREMIUM 2.0)
+
+Você é um **Analista Quantitativo Profissional (Quant Trader)** e **Especialista Tático**. Sua missão é identificar oportunidades de **Valor Esperado Positivo (EV+)** primariamente no mercado **"Resultado Final & Ambas Marcam (BTTS)"**, buscando odds >= 3.00.
+
+${deepAnalysisProtocol}
+
+---
+
+## 🧩 ENTRADA E RESTRIÇÕES
+
+- **Intervalo:** ${startDate} até ${endDate}.
+- **Linguagem:** Português (Portugal/Brasil).
+${leagueConstraint}
+
+- **Filtro de Consistência (Estrito):**
+  ✅ **BUSCA REAL:** Use a ferramenta de busca para encontrar odds e estatísticas **atuais**.
+  ✅ **Critério EV+:** Odds para "Vitória & BTTS" >= 3.00 E EV calculado >= 5%.
+  ✅ **RESTRIÇÃO DE DATAS:** Apenas jogos entre **${startDate}** e **${endDate}**.
+  ⛔ **FILTRO NEGATIVO:** Se um jogo for fora dessas datas, **DESCARTE IMEDIATAMENTE**.
+
+${commonQualityRules}
+
+---
+
+## 🔍 ESTRUTURA DE ANÁLISE (Seguir RIGOROSAMENTE)
+
+1. **Listagem de jogos válidos** com Odd $(\geq 3.00)$ e **Confiança EXTREMA**.
+2. **Análise Quantitativa Tripla** (Domínio, Golo do _Underdog_, Contexto).
+3. **Tabela de resultados detalhada** (dados reais e previsões).
+4. **Top 3 Oportunidades EV+ de Alto Risco/Retorno.**
+5. **Bilhete Combinado Racional (4–6 seleções).**
+
+---
+
+## 📊 3. TABELA DE RESULTADOS DETALHADA
+
+| Data / Hora | Competição | Jogo (Casa x Fora) | Odd (Vitória & BTTS) | EV Calculado | Análise Quantitativa (Resumo) | Confiança |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| DD/MM HH:mm | ... | ... | **>= 3.00** | **+X%** | "xG Casa 2.1 vs xGA Fora 1.8. Valor claro." | **EXTREMA** |
+
+---
+
+## 🏅 4. TOP 3 OPORTUNIDADES EV+
+Destaque as 3 melhores oportunidades com base em EV+ e Confiança EXTREMA, com breve justificativa.
+
+${ticketInstruction}
+
+${verificationChecklist}
+    `;
+  } else if (strategy === BettingStrategy.VALUE) {
+    // --- VALUE BET PROMPT ---
+    const leagueInstruction = leagues.trim() 
+      ? `5. **FILTRO DE LIGAS:** Focar EXCLUSIVAMENTE ou PRIORITARIAMENTE em: **${leagues}**.`
+      : `5. **LIGAS:** Priorizar as grandes ligas europeias e competições UEFA.`;
+
+    promptTemplate = `
+    Você é um **Analista Esportivo Sênior** focado em **Apostas de Valor (Value Betting)**.
+    Objetivo: Encontrar onde a casa de apostas errou na precificação (Odds maiores que a probabilidade real).
+    Sinal visual: check_circle
+
+    ${deepAnalysisProtocol}
+
+  ---
+
+  ## 🧩 REQUISITOS DA TAREFA
+
+  1. **Intervalo:** ${startDate} até ${endDate}.
+  2. **Linguagem:** Português (Portugal/Brasil).
+  3. **RESTRIÇÃO DE DATAS:** O intervalo é estritamente **${startDate} a ${endDate}**.
+  
+  ${leagueInstruction}
+  
+  ${commonQualityRules}
+
+  ---
+
+  ## 📊 TABELA DE ANÁLISE DE VALOR
+
+  | Data / Hora | Competição | Jogo | Odds (1X2) | Aposta Sugerida | Onde está o Valor? (Justificativa) | Confiança |
+  | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+  | DD/MM HH:mm | ... | ... | ... | ... | "Odd justa 1.80, casa paga 2.20" | **ALTA** |
+
+  ---
+
+  ## 🏅 AS 3 MELHORES OPORTUNIDADES
+  **Após a tabela**, destaque:
+  * **As 3 melhores oportunidades** do período (maior **Confiança ALTA** + **Valor/Odd**).
+  * **Explicação Breve** para cada uma (2 linhas).
+
+  ${ticketInstruction}
+
+  ${verificationChecklist}
+    `;
+  } else {
+    // --- CONSERVATIVE PROMPT ---
+    const leagueInstruction = leagues.trim() 
+      ? `5. **FILTRO DE LIGAS:** Focar EXCLUSIVAMENTE ou PRIORITARIAMENTE em: **${leagues}**.`
+      : `5. **LIGAS:** Priorizar as grandes ligas europeias e competições UEFA.`;
+
+    promptTemplate = `
+    Você é um **Analista Esportivo Sênior** focado em **Estratégia Conservadora**.
+    Objetivo: Apostas seguras, alta taxa de acerto (Green), minimização de riscos.
+
+    ${deepAnalysisProtocol}
+
+  ---
+
+  ## 🧩 REQUISITOS DA TAREFA
+
+  1. **Intervalo:** ${startDate} até ${endDate}.
+  2. **Linguagem:** Português (Portugal/Brasil).
+  3. **RESTRIÇÃO DE DATAS:** O intervalo é estritamente **${startDate} a ${endDate}**.
+  
+  ${leagueInstruction}
+  
+  ${commonQualityRules}
+
+  ---
+
+  ## 📊 TABELA DE ANÁLISE CONSERVADORA
+
+  | Data / Hora | Competição | Jogo | Odds | Aposta Segura | Justificativa Tática | Confiança |
+  | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+  | DD/MM HH:mm | ... | ... | ... | ... | Resuma: "Time A domina posse (60%)..." | **ALTA** |
+
+  ${ticketInstruction}
+
+  ## ⚠️ AVISO LEGAL
+  > As análises são baseadas em dados esportivos. Futebol é imprevisível. Aposte com responsabilidade.
+
+  ${verificationChecklist}
+    `;
+  }
 
   return streamGeminiResponse(promptTemplate, [], ModelType.PRO, onStream);
 };
@@ -142,7 +254,7 @@ export const chatWithGemini = async (
   model: ModelType = ModelType.PRO,
   onStream: (chunk: string) => void
 ): Promise<string> => {
-  if (!API_KEY) throw new Error("API Key not found");
+  if (!API_KEY) throw new Error("Chave de API não encontrada");
   
   // Convert base64 to parts if present
   const parts: any[] = [];

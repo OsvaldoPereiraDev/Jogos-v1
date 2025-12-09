@@ -29,4 +29,5 @@ export enum ModelType {
 export enum BettingStrategy {
   CONSERVATIVE = 'conservadora', // High strike rate, lower odds
   VALUE = 'valor', // Higher odds, value betting
+  EV_PREMIUM = 'ev_premium', // High EV+, Win & BTTS, High Odds, Strict Validation
 }

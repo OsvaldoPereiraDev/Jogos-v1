@@ -2,7 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { generateFootballAnalysis, chatWithGemini } from './services/geminiService';
 import { Message, ModelType, BettingStrategy } from './types';
 import MessageBubble from './components/MessageBubble';
-import { v4 as uuidv4 } from 'uuid';
+
+// Simple ID generator to avoid external dependencies causing load errors
+const generateId = () => {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
 
 const App: React.FC = () => {
   // State
@@ -33,7 +37,7 @@ const App: React.FC = () => {
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      // Cast to File[] to avoid 'unknown' type error in strict mode when passing to FileReader
+      // Cast to File[] to avoid 'unknown' type error in strict mode
       const files = Array.from(e.target.files) as File[];
       files.forEach(file => {
         const reader = new FileReader();
@@ -52,10 +56,10 @@ const App: React.FC = () => {
 
   // Generic Chat Handler
   const handleSendMessage = async () => {
-    if (!inputText.trim() && selectedImages.length === 0) return;
+    if ((!inputText.trim() && selectedImages.length === 0) || isLoading) return;
 
     const userMsg: Message = {
-      id: uuidv4(),
+      id: generateId(),
       role: 'user',
       content: inputText,
       timestamp: Date.now(),
@@ -68,7 +72,7 @@ const App: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
     setIsLoading(true);
 
-    const modelMsgId = uuidv4();
+    const modelMsgId = generateId();
     const modelMsg: Message = {
       id: modelMsgId,
       role: 'model',
@@ -89,7 +93,7 @@ const App: React.FC = () => {
     } catch (error) {
       setMessages(prev => prev.map(m => 
         m.id === modelMsgId 
-          ? { ...m, content: "Error: Could not generate response. Please check API Key.", isLoading: false } 
+          ? { ...m, content: "Erro: Não foi possível gerar a resposta. Verifique a sua Chave de API.", isLoading: false } 
           : m
       ));
     } finally {
@@ -99,17 +103,22 @@ const App: React.FC = () => {
 
   // Specific Football Analysis Handler
   const handleGenerateAnalysis = async () => {
+    if (isLoading) return;
+    
+    const strategyName = bettingStrategy === BettingStrategy.EV_PREMIUM ? 'EV+ Premium 2.0' : 
+                         bettingStrategy === BettingStrategy.VALUE ? 'Valor (Agressivo)' : 'Conservadora';
+                         
     const userMsg: Message = {
-      id: uuidv4(),
+      id: generateId(),
       role: 'user',
-      content: `Analyze matches from ${startDate} to ${endDate} (${bettingStrategy} strategy)`,
+      content: `Analise as partidas de ${startDate} até ${endDate} usando a estratégia ${strategyName}${targetLeagues ? ` focando nas ligas: ${targetLeagues}` : ''}.`,
       timestamp: Date.now(),
       type: 'football_analysis'
     };
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
-    const modelMsgId = uuidv4();
+    const modelMsgId = generateId();
     const modelMsg: Message = {
       id: modelMsgId,
       role: 'model',
@@ -130,7 +139,7 @@ const App: React.FC = () => {
     } catch (error) {
        setMessages(prev => prev.map(m => 
         m.id === modelMsgId 
-          ? { ...m, content: "Error: Analysis failed. Ensure API Key is set and valid.", isLoading: false } 
+          ? { ...m, content: "Erro: A análise falhou. Certifique-se de que a Chave de API está configurada e é válida.", isLoading: false } 
           : m
       ));
     } finally {
@@ -142,213 +151,212 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden font-sans selection:bg-emerald-500 selection:text-white">
       {/* Sidebar - Settings & Tools */}
       <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 bg-gray-900 border-r border-gray-800 flex flex-col h-full overflow-hidden shrink-0`}>
-        <div className="p-6 border-b border-gray-800 flex items-center gap-3">
-          <div className="bg-gradient-to-br from-emerald-400 to-green-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-900/50">
-             <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-          </div>
-          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">BetAI Pro</h1>
-        </div>
-
-        <div className="p-6 flex-1 overflow-y-auto">
-          {/* Football Tool Section */}
-          <div className="mb-8">
-            <h3 className="text-xs uppercase font-bold text-gray-500 mb-4 tracking-wider flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
-              Analysis Config
-            </h3>
-            <div className="space-y-4 bg-gray-850 p-4 rounded-xl border border-gray-800 shadow-inner">
-              
-              {/* Dates */}
-              <div className="grid grid-cols-2 gap-3">
+         {/* Sidebar Content */}
+         <div className="p-5 flex-1 overflow-y-auto">
+            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-200 mb-6 flex items-center gap-2">
+               <span className="material-icons text-emerald-400">sports_soccer</span>
+               BetAI Analista Pro
+            </h1>
+            
+            {/* Settings Section */}
+            <div className="space-y-6">
+                
+                {/* Dates */}
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-gray-500 mb-1">Start</label>
-                  <input 
-                    type="date" 
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-xs text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-colors"
-                  />
+                   <label className="block text-xs uppercase tracking-wider text-gray-500 font-bold mb-2">Período de Análise</label>
+                   <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                         <span className="text-xs text-gray-400">Início</span>
+                         <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm focus:border-emerald-500 outline-none text-white" />
+                      </div>
+                      <div className="space-y-1">
+                         <span className="text-xs text-gray-400">Fim</span>
+                         <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm focus:border-emerald-500 outline-none text-white" />
+                      </div>
+                   </div>
                 </div>
+
+                {/* Strategy */}
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-gray-500 mb-1">End</label>
-                  <input 
-                    type="date" 
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-xs text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-colors"
-                  />
+                    <label className="block text-xs uppercase tracking-wider text-gray-500 font-bold mb-2">Estratégia</label>
+                    <div className="grid grid-cols-1 gap-2">
+                        <button 
+                           onClick={() => setBettingStrategy(BettingStrategy.CONSERVATIVE)}
+                           className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-all ${bettingStrategy === BettingStrategy.CONSERVATIVE ? 'bg-emerald-900/40 border-emerald-500 text-emerald-300' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-750'}`}
+                        >
+                           <div className="flex flex-col items-start">
+                              <span className="font-semibold">Conservadora</span>
+                              <span className="text-[10px] opacity-70">Apostas seguras, alta taxa de acerto</span>
+                           </div>
+                           {bettingStrategy === BettingStrategy.CONSERVATIVE && <span className="material-icons text-sm">check_circle</span>}
+                        </button>
+
+                        <button 
+                           onClick={() => setBettingStrategy(BettingStrategy.VALUE)}
+                           className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-all ${bettingStrategy === BettingStrategy.VALUE ? 'bg-blue-900/40 border-blue-500 text-blue-300' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-750'}`}
+                        >
+                           <div className="flex flex-col items-start">
+                              <span className="font-semibold">Aposta de Valor</span>
+                              <span className="text-[10px] opacity-70">Odds maiores, risco calculado</span>
+                           </div>
+                           {bettingStrategy === BettingStrategy.VALUE && <span className="material-icons text-sm">check_circle</span>}
+                        </button>
+
+                        <button 
+                           onClick={() => setBettingStrategy(BettingStrategy.EV_PREMIUM)}
+                           className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-all ${bettingStrategy === BettingStrategy.EV_PREMIUM ? 'bg-amber-900/40 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-750'}`}
+                        >
+                           <div className="flex flex-col items-start">
+                              <span className="font-semibold flex items-center gap-1"><span className="material-icons text-[14px]">bolt</span> EV+ Premium 2.0</span>
+                              <span className="text-[10px] opacity-70">Vitória e Ambas Marcam (Risco Extremo)</span>
+                           </div>
+                           {bettingStrategy === BettingStrategy.EV_PREMIUM && <span className="material-icons text-sm">check_circle</span>}
+                        </button>
+                    </div>
                 </div>
-              </div>
 
-              {/* Strategy Selector */}
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-gray-500 mb-1">Strategy</label>
-                <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-700">
-                  <button 
-                    onClick={() => setBettingStrategy(BettingStrategy.CONSERVATIVE)}
-                    className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-all ${bettingStrategy === BettingStrategy.CONSERVATIVE ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
-                  >
-                    Safe
-                  </button>
-                  <button 
-                    onClick={() => setBettingStrategy(BettingStrategy.VALUE)}
-                    className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-all ${bettingStrategy === BettingStrategy.VALUE ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
-                  >
-                    Value
-                  </button>
+                {/* Leagues */}
+                <div>
+                   <label className="block text-xs uppercase tracking-wider text-gray-500 font-bold mb-2">Ligas Alvo</label>
+                   <textarea 
+                     value={targetLeagues}
+                     onChange={e => setTargetLeagues(e.target.value)}
+                     placeholder="ex: Premier League, Série A, Champions League..."
+                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 outline-none h-20 resize-none placeholder-gray-600"
+                   />
                 </div>
-                <p className="text-[10px] text-gray-500 mt-1.5 leading-tight">
-                  {bettingStrategy === BettingStrategy.CONSERVATIVE 
-                    ? "Focus on high win rate & lower odds."
-                    : "Focus on higher odds & value detection."}
-                </p>
-              </div>
 
-              {/* Leagues Filter */}
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-gray-500 mb-1">Specific Leagues (Optional)</label>
-                <input 
-                  type="text" 
-                  value={targetLeagues}
-                  onChange={(e) => setTargetLeagues(e.target.value)}
-                  placeholder="e.g. Premier League, Serie A..."
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-xs text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-colors placeholder-gray-600"
-                />
-              </div>
-
-              <button 
-                onClick={handleGenerateAnalysis}
-                disabled={isLoading}
-                className="w-full mt-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold py-3 px-4 rounded-lg shadow-lg shadow-emerald-900/20 transform active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-                )}
-                Generate Ticket
-              </button>
+                {/* Action Button */}
+                <button
+                    onClick={handleGenerateAnalysis}
+                    disabled={isLoading}
+                    className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-lg shadow-lg shadow-emerald-900/50 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                    {isLoading ? (
+                        <>
+                           <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                           Analisando...
+                        </>
+                    ) : (
+                        <>
+                           <span className="material-icons text-sm">auto_awesome</span>
+                           Gerar Relatório
+                        </>
+                    )}
+                </button>
             </div>
-          </div>
-
-          {/* Model Selection */}
-          <div className="mb-8">
-            <h3 className="text-xs uppercase font-bold text-gray-500 mb-4 tracking-wider">AI Model</h3>
-            <div className="space-y-2">
-              <button 
-                onClick={() => setActiveModel(ModelType.PRO)}
-                className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${activeModel === ModelType.PRO ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-400' : 'bg-gray-850 border-gray-800 text-gray-400 hover:bg-gray-800'}`}
-              >
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-                  <span className="font-medium">Gemini 3.0 Pro</span>
-                </div>
-                {activeModel === ModelType.PRO && <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>}
-              </button>
-              <div className="text-[10px] text-gray-500 px-1 mt-1">
-                Deep reasoning (32k thinking budget) enabled for complex match analysis.
-              </div>
-            </div>
-          </div>
-        </div>
+         </div>
+         
+         {/* Sidebar Footer */}
+         <div className="p-4 border-t border-gray-800 bg-gray-900">
+             <div className="flex items-center justify-between">
+                 <span className="text-xs text-gray-500">Modelo:</span>
+                 <select 
+                    value={activeModel} 
+                    onChange={e => setActiveModel(e.target.value as ModelType)}
+                    className="bg-gray-800 text-xs text-gray-300 border border-gray-700 rounded px-2 py-1 outline-none"
+                 >
+                     <option value={ModelType.PRO}>Gemini 3 Pro (Raciocínio)</option>
+                     <option value={ModelType.FLASH}>Gemini 2.5 Flash</option>
+                 </select>
+             </div>
+         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-900 via-gray-950 to-gray-950">
-        
-        {/* Header Toggle */}
-        <div className="absolute top-4 left-4 z-10">
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg text-gray-300 hover:text-white transition-colors shadow-lg"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-          </button>
-        </div>
-
-        {/* Chat Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 pt-16">
-          <div className="max-w-4xl mx-auto min-h-full flex flex-col">
-            {messages.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40">
-                <div className="w-20 h-20 bg-gray-800 rounded-2xl mb-6 flex items-center justify-center shadow-2xl border border-gray-700">
-                  <svg className="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" /></svg>
-                </div>
-                <h2 className="text-2xl font-bold mb-2">Ready to Analyze</h2>
-                <p className="max-w-md text-gray-400">
-                  Select your <span className="text-emerald-400">Strategy</span> in the sidebar and generate a professional ticket, or simply chat to ask for specific insights.
-                </p>
+      <div className="flex-1 flex flex-col min-w-0 bg-gray-950">
+          {/* Header */}
+          <div className="h-16 border-b border-gray-800 bg-gray-900/50 backdrop-blur flex items-center px-4 justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                  <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
+                      <span className="material-icons">menu</span>
+                  </button>
+                  <span className="font-semibold text-gray-200">Chat de Análise</span>
               </div>
-            ) : (
-              messages.map(msg => (
-                <MessageBubble key={msg.id} message={msg} />
-              ))
-            )}
-            <div ref={messagesEndRef} />
           </div>
-        </div>
 
-        {/* Input Area */}
-        <div className="p-4 md:p-6 bg-gray-950 border-t border-gray-800">
-          <div className="max-w-4xl mx-auto">
-            {/* Image Preview */}
-            {selectedImages.length > 0 && (
-              <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
-                {selectedImages.map((img, idx) => (
-                  <div key={idx} className="relative group">
-                    <img src={img} alt="Preview" className="h-16 w-16 rounded-lg object-cover border border-emerald-500/30" />
-                    <button onClick={clearImages} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-md hover:bg-red-600 transition-colors">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 scroll-smooth">
+              {messages.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-gray-500 opacity-60">
+                      <span className="material-icons text-6xl mb-4 text-emerald-900">analytics</span>
+                      <p className="text-lg font-medium">Pronto para analisar partidas</p>
+                      <p className="text-sm">Configure no menu lateral e clique em Gerar Relatório</p>
                   </div>
-                ))}
-              </div>
-            )}
-
-            <div className="relative flex items-end gap-2 bg-gray-900 p-2 rounded-2xl border border-gray-800 shadow-xl focus-within:border-emerald-500/50 transition-colors">
-              <input 
-                type="file" 
-                ref={fileInputRef}
-                className="hidden" 
-                accept="image/*" 
-                multiple 
-                onChange={handleImageUpload} 
-              />
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="p-3 text-gray-400 hover:text-emerald-400 hover:bg-gray-800 rounded-xl transition-all"
-                title="Upload Image"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              </button>
-              
-              <textarea 
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                placeholder="Ask about specific matches, players, or stats..."
-                className="w-full bg-transparent text-white border-none focus:ring-0 p-3 min-h-[50px] max-h-[150px] resize-none placeholder-gray-500 text-sm md:text-base"
-                rows={1}
-              />
-              
-              <button 
-                onClick={handleSendMessage}
-                disabled={(!inputText.trim() && selectedImages.length === 0) || isLoading}
-                className="p-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-900/20 disabled:opacity-50 disabled:hover:bg-emerald-600 transition-all mb-0.5"
-              >
-                <svg className="w-5 h-5 transform rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>
-              </button>
-            </div>
+              ) : (
+                  <div className="max-w-4xl mx-auto">
+                      {messages.map(msg => (
+                          <MessageBubble key={msg.id} message={msg} />
+                      ))}
+                      <div ref={messagesEndRef} />
+                  </div>
+              )}
           </div>
-        </div>
+
+          {/* Input Area */}
+          <div className="p-4 border-t border-gray-800 bg-gray-900 shrink-0">
+             <div className="max-w-4xl mx-auto relative">
+                {/* Image Previews */}
+                {selectedImages.length > 0 && (
+                    <div className="absolute bottom-full left-0 mb-2 flex gap-2 p-2 bg-gray-800 rounded-lg border border-gray-700 shadow-xl">
+                        {selectedImages.map((img, idx) => (
+                            <div key={idx} className="relative group">
+                                <img src={img} alt="Preview" className="w-16 h-16 object-cover rounded border border-gray-600" />
+                                <button onClick={() => {
+                                    const newImages = [...selectedImages];
+                                    newImages.splice(idx, 1);
+                                    setSelectedImages(newImages);
+                                    if (newImages.length === 0 && fileInputRef.current) fileInputRef.current.value = '';
+                                }} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <span className="material-icons text-[10px] block">close</span>
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                
+                <div className="flex items-end gap-2 bg-gray-800 p-2 rounded-xl border border-gray-700 focus-within:border-emerald-500/50 focus-within:ring-1 focus-within:ring-emerald-500/20 transition-all shadow-lg">
+                    <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-2 text-gray-400 hover:text-emerald-400 hover:bg-gray-700 rounded-lg transition-colors"
+                        title="Enviar imagem"
+                    >
+                        <span className="material-icons">add_photo_alternate</span>
+                    </button>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        className="hidden" 
+                        accept="image/*" 
+                        multiple 
+                        onChange={handleImageUpload}
+                    />
+                    
+                    <textarea 
+                        value={inputText}
+                        onChange={e => setInputText(e.target.value)}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendMessage();
+                            }
+                        }}
+                        placeholder="Faça uma pergunta de acompanhamento..."
+                        className="flex-1 bg-transparent text-gray-100 placeholder-gray-500 outline-none text-sm md:text-base resize-none py-2 max-h-32 min-h-[40px]"
+                        rows={1}
+                        style={{ height: 'auto', minHeight: '40px' }}
+                    />
+
+                    <button 
+                        onClick={handleSendMessage}
+                        disabled={!inputText.trim() && selectedImages.length === 0 || isLoading}
+                        className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg disabled:opacity-50 disabled:hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-900/20"
+                    >
+                        <span className="material-icons">send</span>
+                    </button>
+                </div>
+             </div>
+          </div>
       </div>
     </div>
   );
